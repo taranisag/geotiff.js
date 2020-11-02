@@ -1,14 +1,13 @@
-import GeoTIFFImage from './geotiffimage';
-import DataView64 from './dataview64';
-import DataSlice from './dataslice';
-import Pool from './pool';
-import { makeRemoteSource, makeBufferSource, makeFileSource, makeFileReaderSource } from './source';
-import { fieldTypes, fieldTagNames, arrayFields, geoKeyNames } from './globals';
-import { writeGeotiff } from './geotiffwriter';
-import * as globals from './globals';
-import * as rgb from './rgb';
-import { getDecoder } from './compression';
-import { setLogger } from './logging';
+import GeoTIFFImage from "./geotiffimage";
+import DataView64 from "./dataview64";
+import DataSlice from "./dataslice";
+import { makeBufferSource } from "./source-rn";
+import { fieldTypes, fieldTagNames, arrayFields, geoKeyNames } from "./globals";
+import { writeGeotiff } from "./geotiffwriter";
+import * as globals from "./globals";
+import * as rgb from "./rgb";
+import { getDecoder } from "./compression";
+import { setLogger } from "./logging";
 
 export { globals };
 export { rgb };
@@ -17,14 +16,25 @@ export { setLogger };
 
 function getFieldTypeLength(fieldType) {
   switch (fieldType) {
-    case fieldTypes.BYTE: case fieldTypes.ASCII: case fieldTypes.SBYTE: case fieldTypes.UNDEFINED:
+    case fieldTypes.BYTE:
+    case fieldTypes.ASCII:
+    case fieldTypes.SBYTE:
+    case fieldTypes.UNDEFINED:
       return 1;
-    case fieldTypes.SHORT: case fieldTypes.SSHORT:
+    case fieldTypes.SHORT:
+    case fieldTypes.SSHORT:
       return 2;
-    case fieldTypes.LONG: case fieldTypes.SLONG: case fieldTypes.FLOAT: case fieldTypes.IFD:
+    case fieldTypes.LONG:
+    case fieldTypes.SLONG:
+    case fieldTypes.FLOAT:
+    case fieldTypes.IFD:
       return 4;
-    case fieldTypes.RATIONAL: case fieldTypes.SRATIONAL: case fieldTypes.DOUBLE:
-    case fieldTypes.LONG8: case fieldTypes.SLONG8: case fieldTypes.IFD8:
+    case fieldTypes.RATIONAL:
+    case fieldTypes.SRATIONAL:
+    case fieldTypes.DOUBLE:
+    case fieldTypes.LONG8:
+    case fieldTypes.SLONG8:
+    case fieldTypes.IFD8:
       return 8;
     default:
       throw new RangeError(`Invalid field type: ${fieldType}`);
@@ -40,8 +50,9 @@ function parseGeoKeyDirectory(fileDirectory) {
   const geoKeyDirectory = {};
   for (let i = 4; i <= rawGeoKeyDirectory[3] * 4; i += 4) {
     const key = geoKeyNames[rawGeoKeyDirectory[i]];
-    const location = (rawGeoKeyDirectory[i + 1])
-      ? (fieldTagNames[rawGeoKeyDirectory[i + 1]]) : null;
+    const location = rawGeoKeyDirectory[i + 1]
+      ? fieldTagNames[rawGeoKeyDirectory[i + 1]]
+      : null;
     const count = rawGeoKeyDirectory[i + 2];
     const offset = rawGeoKeyDirectory[i + 3];
 
@@ -50,9 +61,9 @@ function parseGeoKeyDirectory(fileDirectory) {
       value = offset;
     } else {
       value = fileDirectory[location];
-      if (typeof value === 'undefined' || value === null) {
+      if (typeof value === "undefined" || value === null) {
         throw new Error(`Could not get value of geoKey '${key}'.`);
-      } else if (typeof value === 'string') {
+      } else if (typeof value === "string") {
         value = value.substring(offset, offset + count - 1);
       } else if (value.subarray) {
         value = value.subarray(offset, offset + count);
@@ -72,66 +83,82 @@ function getValues(dataSlice, fieldType, count, offset) {
   const fieldTypeLength = getFieldTypeLength(fieldType);
 
   switch (fieldType) {
-    case fieldTypes.BYTE: case fieldTypes.ASCII: case fieldTypes.UNDEFINED:
-      values = new Uint8Array(count); readMethod = dataSlice.readUint8;
+    case fieldTypes.BYTE:
+    case fieldTypes.ASCII:
+    case fieldTypes.UNDEFINED:
+      values = new Uint8Array(count);
+      readMethod = dataSlice.readUint8;
       break;
     case fieldTypes.SBYTE:
-      values = new Int8Array(count); readMethod = dataSlice.readInt8;
+      values = new Int8Array(count);
+      readMethod = dataSlice.readInt8;
       break;
     case fieldTypes.SHORT:
-      values = new Uint16Array(count); readMethod = dataSlice.readUint16;
+      values = new Uint16Array(count);
+      readMethod = dataSlice.readUint16;
       break;
     case fieldTypes.SSHORT:
-      values = new Int16Array(count); readMethod = dataSlice.readInt16;
+      values = new Int16Array(count);
+      readMethod = dataSlice.readInt16;
       break;
-    case fieldTypes.LONG: case fieldTypes.IFD:
-      values = new Uint32Array(count); readMethod = dataSlice.readUint32;
+    case fieldTypes.LONG:
+    case fieldTypes.IFD:
+      values = new Uint32Array(count);
+      readMethod = dataSlice.readUint32;
       break;
     case fieldTypes.SLONG:
-      values = new Int32Array(count); readMethod = dataSlice.readInt32;
+      values = new Int32Array(count);
+      readMethod = dataSlice.readInt32;
       break;
-    case fieldTypes.LONG8: case fieldTypes.IFD8:
-      values = new Array(count); readMethod = dataSlice.readUint64;
+    case fieldTypes.LONG8:
+    case fieldTypes.IFD8:
+      values = new Array(count);
+      readMethod = dataSlice.readUint64;
       break;
     case fieldTypes.SLONG8:
-      values = new Array(count); readMethod = dataSlice.readInt64;
+      values = new Array(count);
+      readMethod = dataSlice.readInt64;
       break;
     case fieldTypes.RATIONAL:
-      values = new Uint32Array(count * 2); readMethod = dataSlice.readUint32;
+      values = new Uint32Array(count * 2);
+      readMethod = dataSlice.readUint32;
       break;
     case fieldTypes.SRATIONAL:
-      values = new Int32Array(count * 2); readMethod = dataSlice.readInt32;
+      values = new Int32Array(count * 2);
+      readMethod = dataSlice.readInt32;
       break;
     case fieldTypes.FLOAT:
-      values = new Float32Array(count); readMethod = dataSlice.readFloat32;
+      values = new Float32Array(count);
+      readMethod = dataSlice.readFloat32;
       break;
     case fieldTypes.DOUBLE:
-      values = new Float64Array(count); readMethod = dataSlice.readFloat64;
+      values = new Float64Array(count);
+      readMethod = dataSlice.readFloat64;
       break;
     default:
       throw new RangeError(`Invalid field type: ${fieldType}`);
   }
 
   // normal fields
-  if (!(fieldType === fieldTypes.RATIONAL || fieldType === fieldTypes.SRATIONAL)) {
+  if (
+    !(fieldType === fieldTypes.RATIONAL || fieldType === fieldTypes.SRATIONAL)
+  ) {
     for (let i = 0; i < count; ++i) {
-      values[i] = readMethod.call(
-        dataSlice, offset + (i * fieldTypeLength),
-      );
+      values[i] = readMethod.call(dataSlice, offset + i * fieldTypeLength);
     }
-  } else { // RATIONAL or SRATIONAL
+  } else {
+    // RATIONAL or SRATIONAL
     for (let i = 0; i < count; i += 2) {
-      values[i] = readMethod.call(
-        dataSlice, offset + (i * fieldTypeLength),
-      );
+      values[i] = readMethod.call(dataSlice, offset + i * fieldTypeLength);
       values[i + 1] = readMethod.call(
-        dataSlice, offset + ((i * fieldTypeLength) + 4),
+        dataSlice,
+        offset + (i * fieldTypeLength + 4)
       );
     }
   }
 
   if (fieldType === fieldTypes.ASCII) {
-    return new TextDecoder('utf-8').decode(values);
+    return new TextDecoder("utf-8").decode(values);
   }
   return values;
 }
@@ -158,7 +185,6 @@ class GeoTIFFImageIndexError extends Error {
     this.index = index;
   }
 }
-
 
 class GeoTIFFBase {
   /**
@@ -212,10 +238,10 @@ class GeoTIFFBase {
         const [rX, rY] = firstImage.getResolution();
 
         bbox = [
-          oX + (imageWindow[0] * rX),
-          oY + (imageWindow[1] * rY),
-          oX + (imageWindow[2] * rX),
-          oY + (imageWindow[3] * rY),
+          oX + imageWindow[0] * rX,
+          oY + imageWindow[1] * rY,
+          oX + imageWindow[2] * rX,
+          oY + imageWindow[3] * rY,
         ];
       }
 
@@ -225,13 +251,13 @@ class GeoTIFFBase {
 
       if (width) {
         if (resX) {
-          throw new Error('Both width and resX passed');
+          throw new Error("Both width and resX passed");
         }
         resX = (usedBBox[2] - usedBBox[0]) / width;
       }
       if (height) {
         if (resY) {
-          throw new Error('Both width and resY passed');
+          throw new Error("Both width and resY passed");
         }
         resY = (usedBBox[3] - usedBBox[1]) / height;
       }
@@ -242,7 +268,10 @@ class GeoTIFFBase {
       const allImages = [];
       for (let i = 0; i < imageCount; ++i) {
         const image = await this.getImage(i);
-        const { SubfileType: subfileType, NewSubfileType: newSubfileType } = image.fileDirectory;
+        const {
+          SubfileType: subfileType,
+          NewSubfileType: newSubfileType,
+        } = image.fileDirectory;
         if (i === 0 || subfileType === 2 || newSubfileType & 1) {
           allImages.push(image);
         }
@@ -284,7 +313,6 @@ class GeoTIFFBase {
   }
 }
 
-
 /**
  * The abstraction for a whole GeoTIFF file.
  * @augments GeoTIFFBase
@@ -315,8 +343,12 @@ class GeoTIFF extends GeoTIFFBase {
     const fallbackSize = this.bigTiff ? 4048 : 1024;
     return new DataSlice(
       await this.source.fetch(
-        offset, typeof size !== 'undefined' ? size : fallbackSize,
-      ), offset, this.littleEndian, this.bigTiff,
+        offset,
+        typeof size !== "undefined" ? size : fallbackSize
+      ),
+      offset,
+      this.littleEndian,
+      this.bigTiff
     );
   }
 
@@ -333,13 +365,13 @@ class GeoTIFF extends GeoTIFFBase {
     const offsetSize = this.bigTiff ? 8 : 2;
 
     let dataSlice = await this.getSlice(offset);
-    const numDirEntries = this.bigTiff ?
-      dataSlice.readUint64(offset) :
-      dataSlice.readUint16(offset);
+    const numDirEntries = this.bigTiff
+      ? dataSlice.readUint64(offset)
+      : dataSlice.readUint16(offset);
 
     // if the slice does not cover the whole IFD, request a bigger slice, where the
     // whole IFD fits: num of entries + n x tag length + offset to next IFD
-    const byteSize = (numDirEntries * entrySize) + (this.bigTiff ? 16 : 6);
+    const byteSize = numDirEntries * entrySize + (this.bigTiff ? 16 : 6);
     if (!dataSlice.covers(offset, byteSize)) {
       dataSlice = await this.getSlice(offset, byteSize);
     }
@@ -348,12 +380,16 @@ class GeoTIFF extends GeoTIFFBase {
 
     // loop over the IFD and create a file directory object
     let i = offset + (this.bigTiff ? 8 : 2);
-    for (let entryCount = 0; entryCount < numDirEntries; i += entrySize, ++entryCount) {
+    for (
+      let entryCount = 0;
+      entryCount < numDirEntries;
+      i += entrySize, ++entryCount
+    ) {
       const fieldTag = dataSlice.readUint16(i);
       const fieldType = dataSlice.readUint16(i + 2);
-      const typeCount = this.bigTiff ?
-        dataSlice.readUint64(i + 4) :
-        dataSlice.readUint32(i + 4);
+      const typeCount = this.bigTiff
+        ? dataSlice.readUint64(i + 4)
+        : dataSlice.readUint32(i + 4);
 
       let fieldValues;
       let value;
@@ -372,16 +408,32 @@ class GeoTIFF extends GeoTIFFBase {
         // check, whether we actually cover the referenced byte range; if not,
         // request a new slice of bytes to read from it
         if (dataSlice.covers(actualOffset, length)) {
-          fieldValues = getValues(dataSlice, fieldType, typeCount, actualOffset);
+          fieldValues = getValues(
+            dataSlice,
+            fieldType,
+            typeCount,
+            actualOffset
+          );
         } else {
           const fieldDataSlice = await this.getSlice(actualOffset, length);
-          fieldValues = getValues(fieldDataSlice, fieldType, typeCount, actualOffset);
+          fieldValues = getValues(
+            fieldDataSlice,
+            fieldType,
+            typeCount,
+            actualOffset
+          );
         }
       }
 
       // unpack single values from the array
-      if (typeCount === 1 && arrayFields.indexOf(fieldTag) === -1 &&
-        !(fieldType === fieldTypes.RATIONAL || fieldType === fieldTypes.SRATIONAL)) {
+      if (
+        typeCount === 1 &&
+        arrayFields.indexOf(fieldTag) === -1 &&
+        !(
+          fieldType === fieldTypes.RATIONAL ||
+          fieldType === fieldTypes.SRATIONAL
+        )
+      ) {
         value = fieldValues[0];
       } else {
         value = fieldValues;
@@ -392,13 +444,13 @@ class GeoTIFF extends GeoTIFFBase {
     }
     const geoKeyDirectory = parseGeoKeyDirectory(fileDirectory);
     const nextIFDByteOffset = dataSlice.readOffset(
-      offset + offsetSize + (entrySize * numDirEntries),
+      offset + offsetSize + entrySize * numDirEntries
     );
 
     return new ImageFileDirectory(
       fileDirectory,
       geoKeyDirectory,
-      nextIFDByteOffset,
+      nextIFDByteOffset
     );
   }
 
@@ -447,8 +499,12 @@ class GeoTIFF extends GeoTIFFBase {
   async getImage(index = 0) {
     const ifd = await this.requestIFD(index);
     return new GeoTIFFImage(
-      ifd.fileDirectory, ifd.geoKeyDirectory,
-      this.dataView, this.littleEndian, this.cache, this.source,
+      ifd.fileDirectory,
+      ifd.geoKeyDirectory,
+      this.dataView,
+      this.littleEndian,
+      this.cache,
+      this.source
     );
   }
 
@@ -486,22 +542,36 @@ class GeoTIFF extends GeoTIFFBase {
     if (this.ghostValues) {
       return this.ghostValues;
     }
-    const detectionString = 'GDAL_STRUCTURAL_METADATA_SIZE=';
+    const detectionString = "GDAL_STRUCTURAL_METADATA_SIZE=";
     const heuristicAreaSize = detectionString.length + 100;
     let slice = await this.getSlice(offset, heuristicAreaSize);
-    if (detectionString === getValues(slice, fieldTypes.ASCII, detectionString.length, offset)) {
-      const valuesString = getValues(slice, fieldTypes.ASCII, heuristicAreaSize, offset);
-      const firstLine = valuesString.split('\n')[0];
-      const metadataSize = Number(firstLine.split('=')[1].split(' ')[0]) + firstLine.length;
+    if (
+      detectionString ===
+      getValues(slice, fieldTypes.ASCII, detectionString.length, offset)
+    ) {
+      const valuesString = getValues(
+        slice,
+        fieldTypes.ASCII,
+        heuristicAreaSize,
+        offset
+      );
+      const firstLine = valuesString.split("\n")[0];
+      const metadataSize =
+        Number(firstLine.split("=")[1].split(" ")[0]) + firstLine.length;
       if (metadataSize > heuristicAreaSize) {
         slice = await this.getSlice(offset, metadataSize);
       }
-      const fullString = getValues(slice, fieldTypes.ASCII, metadataSize, offset);
+      const fullString = getValues(
+        slice,
+        fieldTypes.ASCII,
+        metadataSize,
+        offset
+      );
       this.ghostValues = {};
       fullString
-        .split('\n')
-        .filter(line => line.length > 0)
-        .map(line => line.split('='))
+        .split("\n")
+        .filter((line) => line.length > 0)
+        .map((line) => line.split("="))
         .forEach(([key, value]) => {
           this.ghostValues[key] = value;
         });
@@ -523,10 +593,10 @@ class GeoTIFF extends GeoTIFFBase {
     let littleEndian;
     if (BOM === 0x4949) {
       littleEndian = true;
-    } else if (BOM === 0x4D4D) {
+    } else if (BOM === 0x4d4d) {
       littleEndian = false;
     } else {
-      throw new TypeError('Invalid byte order value.');
+      throw new TypeError("Invalid byte order value.");
     }
 
     const magicNumber = dataView.getUint16(2, littleEndian);
@@ -537,10 +607,10 @@ class GeoTIFF extends GeoTIFFBase {
       bigTiff = true;
       const offsetByteSize = dataView.getUint16(4, littleEndian);
       if (offsetByteSize !== 8) {
-        throw new Error('Unsupported offset byte-size.');
+        throw new Error("Unsupported offset byte-size.");
       }
     } else {
-      throw new TypeError('Invalid magic number.');
+      throw new TypeError("Invalid magic number.");
     }
 
     const firstIFDOffset = bigTiff
@@ -555,7 +625,7 @@ class GeoTIFF extends GeoTIFFBase {
    * to be closed but only if it has been constructed from a file.
    */
   close() {
-    if (typeof this.source.close === 'function') {
+    if (typeof this.source.close === "function") {
       return this.source.close();
     }
     return false;
@@ -587,8 +657,13 @@ class MultiGeoTIFF extends GeoTIFFBase {
   }
 
   async parseFileDirectoriesPerFile() {
-    const requests = [this.mainFile.parseFileDirectoryAt(this.mainFile.firstIFDOffset)]
-      .concat(this.overviewFiles.map((file) => file.parseFileDirectoryAt(file.firstIFDOffset)));
+    const requests = [
+      this.mainFile.parseFileDirectoryAt(this.mainFile.firstIFDOffset),
+    ].concat(
+      this.overviewFiles.map((file) =>
+        file.parseFileDirectoryAt(file.firstIFDOffset)
+      )
+    );
 
     this.fileDirectoriesPerFile = await Promise.all(requests);
     return this.fileDirectoriesPerFile;
@@ -611,8 +686,12 @@ class MultiGeoTIFF extends GeoTIFFBase {
         if (index === visited) {
           const ifd = await imageFile.requestIFD(relativeIndex);
           return new GeoTIFFImage(
-            ifd.fileDirectory, imageFile.geoKeyDirectory,
-            imageFile.dataView, imageFile.littleEndian, imageFile.cache, imageFile.source,
+            ifd.fileDirectory,
+            imageFile.geoKeyDirectory,
+            imageFile.dataView,
+            imageFile.littleEndian,
+            imageFile.cache,
+            imageFile.source
           );
         }
         visited++;
@@ -621,7 +700,7 @@ class MultiGeoTIFF extends GeoTIFFBase {
       relativeIndex = 0;
     }
 
-    throw new RangeError('Invalid image index');
+    throw new RangeError("Invalid image index");
   }
 
   /**
@@ -633,8 +712,9 @@ class MultiGeoTIFF extends GeoTIFFBase {
     if (this.imageCount !== null) {
       return this.imageCount;
     }
-    const requests = [this.mainFile.getImageCount()]
-      .concat(this.overviewFiles.map((file) => file.getImageCount()));
+    const requests = [this.mainFile.getImageCount()].concat(
+      this.overviewFiles.map((file) => file.getImageCount())
+    );
     this.imageCounts = await Promise.all(requests);
     this.imageCount = this.imageCounts.reduce((count, ifds) => count + ifds, 0);
     return this.imageCount;
@@ -650,9 +730,6 @@ export { MultiGeoTIFF };
  *                           See {@link makeRemoteSource} for details.
  * @returns {Promise.<GeoTIFF>} The resulting GeoTIFF file.
  */
-export async function fromUrl(url, options = {}) {
-  return GeoTIFF.fromSource(makeRemoteSource(url, options));
-}
 
 /**
  * Construct a new GeoTIFF from an
@@ -674,9 +751,6 @@ export async function fromArrayBuffer(arrayBuffer) {
  * @param {string} path The file path to read from.
  * @returns {Promise.<GeoTIFF>} The resulting GeoTIFF file.
  */
-export async function fromFile(path) {
-  return GeoTIFF.fromSource(makeFileSource(path));
-}
 
 /**
  * Construct a GeoTIFF from an HTML
@@ -686,9 +760,6 @@ export async function fromFile(path) {
  * @param {Blob|File} blob The Blob or File object to read from.
  * @returns {Promise.<GeoTIFF>} The resulting GeoTIFF file.
  */
-export async function fromBlob(blob) {
-  return GeoTIFF.fromSource(makeFileReaderSource(blob));
-}
 
 /**
  * Construct a MultiGeoTIFF from the given URLs.
@@ -699,14 +770,6 @@ export async function fromBlob(blob) {
  *                           for details.
  * @returns {Promise.<MultiGeoTIFF>} The resulting MultiGeoTIFF file.
  */
-export async function fromUrls(mainUrl, overviewUrls = [], options = {}) {
-  const mainFile = await GeoTIFF.fromSource(makeRemoteSource(mainUrl, options));
-  const overviewFiles = await Promise.all(
-    overviewUrls.map((url) => GeoTIFF.fromSource(makeRemoteSource(url, options))),
-  );
-
-  return new MultiGeoTIFF(mainFile, overviewFiles);
-}
 
 /**
  * Main creating function for GeoTIFF files.
@@ -716,5 +779,3 @@ export async function fromUrls(mainUrl, overviewUrls = [], options = {}) {
 export async function writeArrayBuffer(values, metadata) {
   return writeGeotiff(values, metadata);
 }
-
-export { Pool };

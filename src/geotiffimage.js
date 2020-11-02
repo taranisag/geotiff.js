@@ -1,10 +1,16 @@
 /* eslint max-len: ["error", { "code": 120 }] */
 
-import txml from 'txml';
-import { photometricInterpretations, ExtraSamplesValues } from './globals';
-import { fromWhiteIsZero, fromBlackIsZero, fromPalette, fromCMYK, fromYCbCr, fromCIELab } from './rgb';
-import { getDecoder } from './compression';
-import { resample, resampleInterleaved } from './resample';
+import { photometricInterpretations, ExtraSamplesValues } from "./globals";
+import {
+  fromWhiteIsZero,
+  fromBlackIsZero,
+  fromPalette,
+  fromCMYK,
+  fromYCbCr,
+  fromCIELab,
+} from "./rgb";
+import { getDecoder } from "./compression";
+import { resample, resampleInterleaved } from "./resample";
 
 function sum(array, start, end) {
   let s = 0;
@@ -53,7 +59,7 @@ function arrayForType(format, bitsPerSample, size) {
     default:
       break;
   }
-  throw Error('Unsupported data format/bitsPerSample');
+  throw Error("Unsupported data format/bitsPerSample");
 }
 
 /**
@@ -77,9 +83,10 @@ class GeoTIFFImage {
     this.tiles = cache ? {} : null;
     this.isTiled = !fileDirectory.StripOffsets;
     const planarConfiguration = fileDirectory.PlanarConfiguration;
-    this.planarConfiguration = (typeof planarConfiguration === 'undefined') ? 1 : planarConfiguration;
+    this.planarConfiguration =
+      typeof planarConfiguration === "undefined" ? 1 : planarConfiguration;
     if (this.planarConfiguration !== 1 && this.planarConfiguration !== 2) {
-      throw new Error('Invalid planar configuration.');
+      throw new Error("Invalid planar configuration.");
     }
 
     this.source = source;
@@ -141,7 +148,7 @@ class GeoTIFFImage {
     if (this.isTiled) {
       return this.fileDirectory.TileLength;
     }
-    if (typeof this.fileDirectory.RowsPerStrip !== 'undefined') {
+    if (typeof this.fileDirectory.RowsPerStrip !== "undefined") {
       return Math.min(this.fileDirectory.RowsPerStrip, this.getHeight());
     }
     return this.getHeight();
@@ -156,10 +163,12 @@ class GeoTIFFImage {
     let bitsPerSample = 0;
     for (let i = 0; i < this.fileDirectory.BitsPerSample.length; ++i) {
       const bits = this.fileDirectory.BitsPerSample[i];
-      if ((bits % 8) !== 0) {
+      if (bits % 8 !== 0) {
         throw new Error(`Sample bit-width of ${bits} is not supported.`);
       } else if (bits !== this.fileDirectory.BitsPerSample[0]) {
-        throw new Error('Differing size of samples in a pixel are not supported.');
+        throw new Error(
+          "Differing size of samples in a pixel are not supported."
+        );
       }
       bitsPerSample += bits;
     }
@@ -171,15 +180,16 @@ class GeoTIFFImage {
       throw new RangeError(`Sample index ${i} is out of range.`);
     }
     const bits = this.fileDirectory.BitsPerSample[i];
-    if ((bits % 8) !== 0) {
+    if (bits % 8 !== 0) {
       throw new Error(`Sample bit-width of ${bits} is not supported.`);
     }
-    return (bits / 8);
+    return bits / 8;
   }
 
   getReaderForSample(sampleIndex) {
     const format = this.fileDirectory.SampleFormat
-      ? this.fileDirectory.SampleFormat[sampleIndex] : 1;
+      ? this.fileDirectory.SampleFormat[sampleIndex]
+      : 1;
     const bitsPerSample = this.fileDirectory.BitsPerSample[sampleIndex];
     switch (format) {
       case 1: // unsigned integer data
@@ -219,12 +229,13 @@ class GeoTIFFImage {
       default:
         break;
     }
-    throw Error('Unsupported data format/bitsPerSample');
+    throw Error("Unsupported data format/bitsPerSample");
   }
 
   getArrayForSample(sampleIndex, size) {
     const format = this.fileDirectory.SampleFormat
-      ? this.fileDirectory.SampleFormat[sampleIndex] : 1;
+      ? this.fileDirectory.SampleFormat[sampleIndex]
+      : 1;
     const bitsPerSample = this.fileDirectory.BitsPerSample[sampleIndex];
     return arrayForType(format, bitsPerSample, size);
   }
@@ -243,9 +254,9 @@ class GeoTIFFImage {
     let index;
     const { tiles } = this;
     if (this.planarConfiguration === 1) {
-      index = (y * numTilesPerRow) + x;
+      index = y * numTilesPerRow + x;
     } else if (this.planarConfiguration === 2) {
-      index = (sample * numTilesPerRow * numTilesPerCol) + (y * numTilesPerRow) + x;
+      index = sample * numTilesPerRow * numTilesPerCol + y * numTilesPerRow + x;
     }
 
     let offset;
@@ -280,19 +291,28 @@ class GeoTIFFImage {
    * @param {Pool} pool The decoder pool
    * @returns {Promise<TypedArray[]>|Promise<TypedArray>}
    */
-  async _readRaster(imageWindow, samples, valueArrays, interleave, poolOrDecoder, width, height, resampleMethod) {
+  async _readRaster(
+    imageWindow,
+    samples,
+    valueArrays,
+    interleave,
+    poolOrDecoder,
+    width,
+    height,
+    resampleMethod
+  ) {
     const tileWidth = this.getTileWidth();
     const tileHeight = this.getTileHeight();
 
     const minXTile = Math.max(Math.floor(imageWindow[0] / tileWidth), 0);
     const maxXTile = Math.min(
       Math.ceil(imageWindow[2] / tileWidth),
-      Math.ceil(this.getWidth() / this.getTileWidth()),
+      Math.ceil(this.getWidth() / this.getTileWidth())
     );
     const minYTile = Math.max(Math.floor(imageWindow[1] / tileHeight), 0);
     const maxYTile = Math.min(
       Math.ceil(imageWindow[3] / tileHeight),
-      Math.ceil(this.getHeight() / this.getTileHeight()),
+      Math.ceil(this.getHeight() / this.getTileHeight())
     );
     const windowWidth = imageWindow[2] - imageWindow[0];
 
@@ -302,7 +322,9 @@ class GeoTIFFImage {
     const sampleReaders = [];
     for (let i = 0; i < samples.length; ++i) {
       if (this.planarConfiguration === 1) {
-        srcSampleOffsets.push(sum(this.fileDirectory.BitsPerSample, 0, samples[i]) / 8);
+        srcSampleOffsets.push(
+          sum(this.fileDirectory.BitsPerSample, 0, samples[i]) / 8
+        );
       } else {
         srcSampleOffsets.push(0);
       }
@@ -320,7 +342,12 @@ class GeoTIFFImage {
           if (this.planarConfiguration === 2) {
             bytesPerPixel = this.getSampleByteSize(sample);
           }
-          const promise = this.getTileOrStrip(xTile, yTile, sample, poolOrDecoder);
+          const promise = this.getTileOrStrip(
+            xTile,
+            yTile,
+            sample,
+            poolOrDecoder
+          );
           promises.push(promise);
           promise.then((tile) => {
             const buffer = tile.data;
@@ -331,25 +358,46 @@ class GeoTIFFImage {
             const lastCol = (tile.x + 1) * tileWidth;
             const reader = sampleReaders[si];
 
-            const ymax = Math.min(tileHeight, tileHeight - (lastLine - imageWindow[3]));
-            const xmax = Math.min(tileWidth, tileWidth - (lastCol - imageWindow[2]));
+            const ymax = Math.min(
+              tileHeight,
+              tileHeight - (lastLine - imageWindow[3])
+            );
+            const xmax = Math.min(
+              tileWidth,
+              tileWidth - (lastCol - imageWindow[2])
+            );
 
-            for (let y = Math.max(0, imageWindow[1] - firstLine); y < ymax; ++y) {
-              for (let x = Math.max(0, imageWindow[0] - firstCol); x < xmax; ++x) {
-                const pixelOffset = ((y * tileWidth) + x) * bytesPerPixel;
+            for (
+              let y = Math.max(0, imageWindow[1] - firstLine);
+              y < ymax;
+              ++y
+            ) {
+              for (
+                let x = Math.max(0, imageWindow[0] - firstCol);
+                x < xmax;
+                ++x
+              ) {
+                const pixelOffset = (y * tileWidth + x) * bytesPerPixel;
                 const value = reader.call(
-                  dataView, pixelOffset + srcSampleOffsets[si], littleEndian,
+                  dataView,
+                  pixelOffset + srcSampleOffsets[si],
+                  littleEndian
                 );
                 let windowCoordinate;
                 if (interleave) {
-                  windowCoordinate = ((y + firstLine - imageWindow[1]) * windowWidth * samples.length)
-                    + ((x + firstCol - imageWindow[0]) * samples.length)
-                    + si;
+                  windowCoordinate =
+                    (y + firstLine - imageWindow[1]) *
+                      windowWidth *
+                      samples.length +
+                    (x + firstCol - imageWindow[0]) * samples.length +
+                    si;
                   valueArrays[windowCoordinate] = value;
                 } else {
-                  windowCoordinate = (
-                    (y + firstLine - imageWindow[1]) * windowWidth
-                  ) + x + firstCol - imageWindow[0];
+                  windowCoordinate =
+                    (y + firstLine - imageWindow[1]) * windowWidth +
+                    x +
+                    firstCol -
+                    imageWindow[0];
                   valueArrays[si][windowCoordinate] = value;
                 }
               }
@@ -360,25 +408,29 @@ class GeoTIFFImage {
     }
     await Promise.all(promises);
 
-    if ((width && (imageWindow[2] - imageWindow[0]) !== width)
-        || (height && (imageWindow[3] - imageWindow[1]) !== height)) {
+    if (
+      (width && imageWindow[2] - imageWindow[0] !== width) ||
+      (height && imageWindow[3] - imageWindow[1] !== height)
+    ) {
       let resampled;
       if (interleave) {
         resampled = resampleInterleaved(
           valueArrays,
           imageWindow[2] - imageWindow[0],
           imageWindow[3] - imageWindow[1],
-          width, height,
+          width,
+          height,
           samples.length,
-          resampleMethod,
+          resampleMethod
         );
       } else {
         resampled = resample(
           valueArrays,
           imageWindow[2] - imageWindow[0],
           imageWindow[3] - imageWindow[1],
-          width, height,
-          resampleMethod,
+          width,
+          height,
+          resampleMethod
         );
       }
       resampled.width = width;
@@ -419,14 +471,20 @@ class GeoTIFFImage {
    * @returns {Promise.<(TypedArray|TypedArray[])>} the decoded arrays as a promise
    */
   async readRasters({
-    window: wnd, samples = [], interleave, pool = null,
-    width, height, resampleMethod, fillValue,
+    window: wnd,
+    samples = [],
+    interleave,
+    pool = null,
+    width,
+    height,
+    resampleMethod,
+    fillValue,
   } = {}) {
     const imageWindow = wnd || [0, 0, this.getWidth(), this.getHeight()];
 
     // check parameters
     if (imageWindow[0] > imageWindow[2] || imageWindow[1] > imageWindow[3]) {
-      throw new Error('Invalid subsets');
+      throw new Error("Invalid subsets");
     }
 
     const imageWindowWidth = imageWindow[2] - imageWindow[0];
@@ -440,16 +498,26 @@ class GeoTIFFImage {
     } else {
       for (let i = 0; i < samples.length; ++i) {
         if (samples[i] >= this.fileDirectory.SamplesPerPixel) {
-          return Promise.reject(new RangeError(`Invalid sample index '${samples[i]}'.`));
+          return Promise.reject(
+            new RangeError(`Invalid sample index '${samples[i]}'.`)
+          );
         }
       }
     }
     let valueArrays;
     if (interleave) {
       const format = this.fileDirectory.SampleFormat
-        ? Math.max.apply(null, this.fileDirectory.SampleFormat) : 1;
-      const bitsPerSample = Math.max.apply(null, this.fileDirectory.BitsPerSample);
-      valueArrays = arrayForType(format, bitsPerSample, numPixels * samples.length);
+        ? Math.max.apply(null, this.fileDirectory.SampleFormat)
+        : 1;
+      const bitsPerSample = Math.max.apply(
+        null,
+        this.fileDirectory.BitsPerSample
+      );
+      valueArrays = arrayForType(
+        format,
+        bitsPerSample,
+        numPixels * samples.length
+      );
       if (fillValue) {
         valueArrays.fill(fillValue);
       }
@@ -469,7 +537,14 @@ class GeoTIFFImage {
     const poolOrDecoder = pool || getDecoder(this.fileDirectory);
 
     const result = await this._readRaster(
-      imageWindow, samples, valueArrays, interleave, poolOrDecoder, width, height, resampleMethod,
+      imageWindow,
+      samples,
+      valueArrays,
+      interleave,
+      poolOrDecoder,
+      width,
+      height,
+      resampleMethod
     );
     return result;
   }
@@ -493,19 +568,29 @@ class GeoTIFFImage {
    * @param {bool} [enableAlpha=false] Enable reading alpha channel if present.
    * @returns {Promise.<TypedArray|TypedArray[]>} the RGB array as a Promise
    */
-  async readRGB({ window, pool = null, width, height, resampleMethod, enableAlpha = false } = {}) {
+  async readRGB({
+    window,
+    pool = null,
+    width,
+    height,
+    resampleMethod,
+    enableAlpha = false,
+  } = {}) {
     const imageWindow = window || [0, 0, this.getWidth(), this.getHeight()];
 
     // check parameters
     if (imageWindow[0] > imageWindow[2] || imageWindow[1] > imageWindow[3]) {
-      throw new Error('Invalid subsets');
+      throw new Error("Invalid subsets");
     }
 
     const pi = this.fileDirectory.PhotometricInterpretation;
 
     if (pi === photometricInterpretations.RGB) {
       let s = [0, 1, 2];
-      if ((!(this.fileDirectory.ExtraSamples === ExtraSamplesValues.Unspecified)) && enableAlpha) {
+      if (
+        !(this.fileDirectory.ExtraSamples === ExtraSamplesValues.Unspecified) &&
+        enableAlpha
+      ) {
         s = [];
         for (let i = 0; i < this.fileDirectory.BitsPerSample.length; i += 1) {
           s.push(i);
@@ -536,7 +621,7 @@ class GeoTIFFImage {
         samples = [0, 1, 2];
         break;
       default:
-        throw new Error('Invalid or unsupported photometric interpretation.');
+        throw new Error("Invalid or unsupported photometric interpretation.");
     }
 
     const subOptions = {
@@ -573,7 +658,7 @@ class GeoTIFFImage {
         data = fromCIELab(raster);
         break;
       default:
-        throw new Error('Unsupported photometric interpretation.');
+        throw new Error("Unsupported photometric interpretation.");
     }
     data.width = raster.width;
     data.height = raster.height;
@@ -613,34 +698,7 @@ class GeoTIFFImage {
    * @returns {Object}
    */
   getGDALMetadata(sample = null) {
-    const metadata = {};
-    if (!this.fileDirectory.GDAL_METADATA) {
-      return null;
-    }
-    const string = this.fileDirectory.GDAL_METADATA;
-    const xmlDom = txml(string.substring(0, string.length - 1));
-
-    if (!xmlDom[0].tagName) {
-      throw new Error('Failed to parse GDAL metadata XML.');
-    }
-
-    const root = xmlDom[0];
-    if (root.tagName !== 'GDALMetadata') {
-      throw new Error('Unexpected GDAL metadata XML tag.');
-    }
-
-    let items = root.children
-      .filter((child) => child.tagName === 'Item');
-
-    if (sample !== null) {
-      items = items.filter((item) => Number(item.attributes.sample) === sample);
-    }
-
-    for (let i = 0; i < items.length; ++i) {
-      const item = items[i];
-      metadata[item.attributes.name] = item.children[0];
-    }
-    return metadata;
+    return null;
   }
 
   /**
@@ -664,11 +722,7 @@ class GeoTIFFImage {
     const tiePoints = this.fileDirectory.ModelTiepoint;
     const modelTransformation = this.fileDirectory.ModelTransformation;
     if (tiePoints && tiePoints.length === 6) {
-      return [
-        tiePoints[3],
-        tiePoints[4],
-        tiePoints[5],
-      ];
+      return [tiePoints[3], tiePoints[4], tiePoints[5]];
     }
     if (modelTransformation) {
       return [
@@ -677,7 +731,7 @@ class GeoTIFFImage {
         modelTransformation[11],
       ];
     }
-    throw new Error('The image does not have an affine transformation.');
+    throw new Error("The image does not have an affine transformation.");
   }
 
   /**
@@ -693,11 +747,7 @@ class GeoTIFFImage {
     const modelTransformation = this.fileDirectory.ModelTransformation;
 
     if (modelPixelScale) {
-      return [
-        modelPixelScale[0],
-        -modelPixelScale[1],
-        modelPixelScale[2],
-      ];
+      return [modelPixelScale[0], -modelPixelScale[1], modelPixelScale[2]];
     }
     if (modelTransformation) {
       return [
@@ -710,13 +760,13 @@ class GeoTIFFImage {
     if (referenceImage) {
       const [refResX, refResY, refResZ] = referenceImage.getResolution();
       return [
-        refResX * referenceImage.getWidth() / this.getWidth(),
-        refResY * referenceImage.getHeight() / this.getHeight(),
-        refResZ * referenceImage.getWidth() / this.getWidth(),
+        (refResX * referenceImage.getWidth()) / this.getWidth(),
+        (refResY * referenceImage.getHeight()) / this.getHeight(),
+        (refResZ * referenceImage.getWidth()) / this.getWidth(),
       ];
     }
 
-    throw new Error('The image does not have an affine transformation.');
+    throw new Error("The image does not have an affine transformation.");
   }
 
   /**
@@ -740,8 +790,8 @@ class GeoTIFFImage {
     const x1 = origin[0];
     const y1 = origin[1];
 
-    const x2 = x1 + (resolution[0] * this.getWidth());
-    const y2 = y1 + (resolution[1] * this.getHeight());
+    const x2 = x1 + resolution[0] * this.getWidth();
+    const y2 = y1 + resolution[1] * this.getHeight();
 
     return [
       Math.min(x1, x2),
