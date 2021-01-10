@@ -60,7 +60,7 @@
     "docs": "rm -rf docs/; jsdoc -c .jsdoc.json -r src README.md -d docs",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "prepare": "npm run build:node",
+    "prepare": "npm run build:browser",
     "test": "mocha --require @babel/register test/geotiff.spec.js"
   },
   "author": "Fabian Schindler",
