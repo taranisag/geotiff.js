@@ -50,7 +50,7 @@
     "serve-static": "^1.14.1"
   },
   "scripts": {
-    "build": "npm run build:clean; run-p build:browser build:node;",
+    "build": "npm run build:browser && npm run build:node",
     "build:clean": "rm -rf dist-node/ dist-browser/",
     "build:node": "parcel build src/geotiff.js --target node --out-dir dist-node/",
     "build:browser": "parcel build src/geotiff.js --target browser --out-dir dist-browser/ --global GeoTIFF --public-url .",
@@ -60,7 +60,7 @@
     "docs": "rm -rf docs/; jsdoc -c .jsdoc.json -r src README.md -d docs",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "prepare": "npm run build:browser",
+    "prepare": "npm run build",
     "test": "mocha --require @babel/register test/geotiff.spec.js"
   },
   "author": "Fabian Schindler",
