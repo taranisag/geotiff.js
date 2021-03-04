@@ -1,5 +1,2 @@
 node_modules
-dist
-dist-node
-dist-browser
 .DS_Store
